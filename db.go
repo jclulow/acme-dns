@@ -19,6 +19,13 @@ import (
 // DBVersion shows the database version this code uses. This is used for update checks.
 var DBVersion = 1
 
+/*
+ * In order to support a certificate with a larger number of alternative names
+ * we will remember a larger number of TXT records than the default
+ * distribution.
+ */
+var recordMax = 32
+
 var acmeTable = `
 	CREATE TABLE IF NOT EXISTS acmedns(
 		Name TEXT,
@@ -165,8 +172,9 @@ func (d *acmedb) handleDBUpgradeTo1() error {
 func (d *acmedb) NewTXTValuesInTransaction(tx *sql.Tx, subdomain string) error {
 	var err error
 	instr := fmt.Sprintf("INSERT INTO txt (Subdomain, LastUpdate) values('%s', 0)", subdomain)
-	_, _ = tx.Exec(instr)
-	_, _ = tx.Exec(instr)
+	for i := 0; i < recordMax; i++ {
+		_, err = tx.Exec(instr)
+	}
 	return err
 }
 
@@ -253,7 +261,7 @@ func (d *acmedb) GetTXTForDomain(domain string) ([]string, error) {
 	domain = sanitizeString(domain)
 	var txts []string
 	getSQL := `
-	SELECT Value FROM txt WHERE Subdomain=$1 LIMIT 2
+	SELECT Value FROM txt WHERE Subdomain=$1 LIMIT $2
 	`
 	if Config.Database.Engine == "sqlite3" {
 		getSQL = getSQLiteStmt(getSQL)
@@ -264,7 +272,7 @@ func (d *acmedb) GetTXTForDomain(domain string) ([]string, error) {
 		return txts, err
 	}
 	defer sm.Close()
-	rows, err := sm.Query(domain)
+	rows, err := sm.Query(domain, recordMax)
 	if err != nil {
 		return txts, err
 	}
