@@ -24,7 +24,7 @@ var DBVersion = 1
  * we will remember a larger number of TXT records than the default
  * distribution.
  */
-var recordMax = 32
+var recordMax = 16
 
 var acmeTable = `
 	CREATE TABLE IF NOT EXISTS acmedns(
